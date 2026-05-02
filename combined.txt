@@ -1,0 +1,1876 @@
+D:\ProjectsVVV\_Tools\path-polygon-lab\package.json
+--------------------------------------------------
+{
+  "name": "path-polygon-lab",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@remotion/paths": "^4.0.455",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.12.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "eslint": "^10.2.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.5.0",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.58.2",
+    "vite": "^8.0.10"
+  }
+}
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\eslint.config.js
+--------------------------------------------------
+import js from '@eslint/js'
+import globals from 'globals'
+import reactHooks from 'eslint-plugin-react-hooks'
+import reactRefresh from 'eslint-plugin-react-refresh'
+import tseslint from 'typescript-eslint'
+import { defineConfig, globalIgnores } from 'eslint/config'
+
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      js.configs.recommended,
+      tseslint.configs.recommended,
+      reactHooks.configs.flat.recommended,
+      reactRefresh.configs.vite,
+    ],
+    languageOptions: {
+      globals: globals.browser,
+    },
+  },
+])
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\vite.config.ts
+--------------------------------------------------
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [react()],
+})
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\App.tsx
+--------------------------------------------------
+import { PathLab } from "./features/path-lab/PathLab";
+
+function App() {
+  return <PathLab />;
+}
+
+export default App;
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\main.tsx
+--------------------------------------------------
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import App from './App.tsx'
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\assets
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\PathLab.tsx
+--------------------------------------------------
+import { useState } from "react";
+
+import { DEFAULT_PATH_LAB_INPUT_STATE } from "./constants/defaultPathLabState";
+import { PathControlsPanel } from "./components/PathControlsPanel/PathControlsPanel";
+import { PathLabLayout } from "./components/PathLabLayout/PathLabLayout";
+import { PathPreviewPanel } from "./components/PathPreviewPanel/PathPreviewPanel";
+import { computePathLabResult } from "./logic/computePathLabResult";
+import type {
+  PathLabComputedResult,
+  PathLabInputState,
+} from "./types/pathLabTypes";
+
+type ComputedSnapshot = {
+  input: PathLabInputState;
+  result: PathLabComputedResult;
+};
+
+export function PathLab() {
+  const [input, setInput] = useState<PathLabInputState>(
+    DEFAULT_PATH_LAB_INPUT_STATE,
+  );
+
+  const [computedSnapshot, setComputedSnapshot] =
+    useState<ComputedSnapshot | null>(() => {
+      const initialInput = DEFAULT_PATH_LAB_INPUT_STATE;
+
+      return {
+        input: initialInput,
+        result: computePathLabResult(initialInput),
+      };
+    });
+
+  function handleCompute() {
+    setComputedSnapshot({
+      input,
+      result: computePathLabResult(input),
+    });
+  }
+
+  function handlePrintFinalPolygonJson() {
+    if (!computedSnapshot) {
+      return;
+    }
+
+    console.group("[path-polygon-lab] finalPolygon");
+    console.log(JSON.stringify(computedSnapshot.result.finalPolygon, null, 2));
+    console.groupEnd();
+  }
+
+  return (
+    <PathLabLayout
+      sidebar={
+        <PathControlsPanel
+          input={input}
+          result={computedSnapshot?.result ?? null}
+          onInputChange={setInput}
+          onCompute={handleCompute}
+          onPrintFinalPolygonJson={handlePrintFinalPolygonJson}
+        />
+      }
+      playground={
+        <PathPreviewPanel
+          pathData={computedSnapshot?.input.pathData ?? input.pathData}
+          result={computedSnapshot?.result ?? null}
+        />
+      }
+    />
+  );
+}
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\components
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\components\PathControlsPanel
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\components\PathControlsPanel\PathControlsPanel.styles.ts
+--------------------------------------------------
+import styled from "@emotion/styled";
+
+export const Panel = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+`;
+
+export const FieldGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+export const Label = styled.label`
+  color: #cbd5e1;
+  font-size: 13px;
+  font-weight: 700;
+`;
+
+export const TextArea = styled.textarea`
+  width: 100%;
+  min-height: 100px;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #e5e7eb;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  outline: none;
+
+  &:focus {
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.16);
+  }
+`;
+
+export const NumberInput = styled.input`
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #e5e7eb;
+  font-size: 14px;
+  outline: none;
+
+  &:focus {
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.16);
+  }
+`;
+
+export const ButtonRow = styled.div`
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+`;
+
+export const PrimaryButton = styled.button`
+  width: 100%;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: #38bdf8;
+  color: #082f49;
+  cursor: pointer;
+  font-weight: 800;
+
+  &:hover {
+    background: #7dd3fc;
+  }
+`;
+
+export const SecondaryButton = styled.button`
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #e5e7eb;
+  cursor: pointer;
+  font-weight: 700;
+
+  &:hover:not(:disabled) {
+    border-color: #38bdf8;
+    color: #bae6fd;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+`;
+
+export const StatsCard = styled.div`
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 14px;
+  background: rgba(30, 41, 59, 0.48);
+`;
+
+export const StatRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #cbd5e1;
+  font-size: 13px;
+
+  strong {
+    color: #f8fafc;
+    font-size: 14px;
+  }
+`;
+
+export const DiagnosticsList = styled.div`
+  display: grid;
+  gap: 8px;
+`;
+
+export const DiagnosticItem = styled.div<{
+  level: "error" | "warning" | "info";
+}>`
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: ${({ level }) =>
+    level === "error"
+      ? "rgba(239, 68, 68, 0.14)"
+      : level === "warning"
+        ? "rgba(245, 158, 11, 0.14)"
+        : "rgba(56, 189, 248, 0.12)"};
+  color: #e5e7eb;
+  font-size: 12px;
+  line-height: 1.45;
+
+  strong {
+    display: block;
+    margin-bottom: 4px;
+    color: #f8fafc;
+  }
+`;
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\components\PathControlsPanel\PathControlsPanel.tsx
+--------------------------------------------------
+import type { ChangeEvent } from "react";
+
+import type {
+  PathLabComputedResult,
+  PathLabInputState,
+} from "../../types/pathLabTypes";
+import {
+  ButtonRow,
+  DiagnosticItem,
+  DiagnosticsList,
+  FieldGroup,
+  Label,
+  NumberInput,
+  Panel,
+  PrimaryButton,
+  SecondaryButton,
+  StatRow,
+  StatsCard,
+  TextArea,
+} from "./PathControlsPanel.styles";
+
+type PathControlsPanelProps = {
+  input: PathLabInputState;
+  result: PathLabComputedResult | null;
+  onInputChange: (nextInput: PathLabInputState) => void;
+  onCompute: () => void;
+  onPrintFinalPolygonJson: () => void;
+};
+
+function formatNumber(value: number): string {
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+
+  return Number.parseFloat(value.toFixed(2)).toString();
+}
+
+export function PathControlsPanel({
+  input,
+  result,
+  onInputChange,
+  onCompute,
+  onPrintFinalPolygonJson,
+}: PathControlsPanelProps) {
+  function handlePathDataChange(event: ChangeEvent<HTMLTextAreaElement>) {
+    onInputChange({
+      ...input,
+      pathData: event.target.value,
+    });
+  }
+
+  function handleSampleSegmentCountChange(
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    onInputChange({
+      ...input,
+      sampleSegmentCount: Number(event.target.value),
+    });
+  }
+
+  return (
+    <Panel>
+      <FieldGroup>
+        <Label htmlFor="path-data">SVG path</Label>
+        <TextArea
+          id="path-data"
+          value={input.pathData}
+          spellCheck={false}
+          onChange={handlePathDataChange}
+        />
+      </FieldGroup>
+
+      <FieldGroup>
+        <Label htmlFor="sample-segment-count">
+          Кількість точок дискретизації
+        </Label>
+        <NumberInput
+          id="sample-segment-count"
+          type="number"
+          min={1}
+          step={1}
+          value={input.sampleSegmentCount}
+          onChange={handleSampleSegmentCountChange}
+        />
+      </FieldGroup>
+
+      <ButtonRow>
+        <PrimaryButton type="button" onClick={onCompute}>
+          Перерахувати
+        </PrimaryButton>
+
+        <SecondaryButton
+          type="button"
+          disabled={!result}
+          onClick={onPrintFinalPolygonJson}
+        >
+          Вивести finalPolygon JSON у Console
+        </SecondaryButton>
+      </ButtonRow>
+
+      <StatsCard>
+        <StatRow>
+          <span>Path length</span>
+          <strong>{result ? formatNumber(result.pathLength) : "—"}</strong>
+        </StatRow>
+
+        <StatRow>
+          <span>Raw sampled points</span>
+          <strong>{result?.rawSampledPolyline.length ?? "—"}</strong>
+        </StatRow>
+
+        <StatRow>
+          <span>Final polygon nodes</span>
+          <strong>{result?.finalPolygon.length ?? "—"}</strong>
+        </StatRow>
+
+        <StatRow>
+          <span>Removed points</span>
+          <strong>{result?.removedPointCount ?? "—"}</strong>
+        </StatRow>
+
+        <StatRow>
+          <span>Path closed by Z/z</span>
+          <strong>{result ? (result.isPathClosed ? "yes" : "no") : "—"}</strong>
+        </StatRow>
+      </StatsCard>
+
+      {result && result.diagnostics.length > 0 && (
+        <DiagnosticsList>
+          {result.diagnostics.map((diagnostic) => (
+            <DiagnosticItem
+              key={`${diagnostic.level}-${diagnostic.code}`}
+              level={diagnostic.level}
+            >
+              <strong>{diagnostic.code}</strong>
+              {diagnostic.message}
+            </DiagnosticItem>
+          ))}
+        </DiagnosticsList>
+      )}
+    </Panel>
+  );
+}
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\components\PathLabLayout
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\components\PathLabLayout\PathLabLayout.styles.ts
+--------------------------------------------------
+import styled from "@emotion/styled";
+
+export const Shell = styled.div`
+  height: 100vh;
+  display: flex;
+  background: #0f172a;
+  color: #e5e7eb;
+`;
+
+export const Sidebar = styled.aside`
+  width: 360px;
+  min-width: 360px;
+  max-width: 360px;
+  /* min-height: 100vh; */
+  padding: 24px;
+  border-right: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(15, 23, 42, 0.96);
+  overflow-y: auto;
+  overflow-x: hidden;
+`;
+
+export const Playground = styled.main`
+  flex: 1;
+  min-width: 0;
+  /* min-height: 100vh; */
+  padding: 24px;
+  overflow: hidden;
+`;
+
+export const SidebarTitle = styled.div`
+  margin-bottom: 24px;
+
+  p {
+    margin: 0 0 6px;
+    color: #38bdf8;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 24px;
+    line-height: 1.15;
+  }
+`;
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\components\PathLabLayout\PathLabLayout.tsx
+--------------------------------------------------
+import type { ReactNode } from "react";
+
+import {
+  Playground,
+  Shell,
+  Sidebar,
+  SidebarTitle,
+} from "./PathLabLayout.styles";
+
+type PathLabLayoutProps = {
+  sidebar: ReactNode;
+  playground: ReactNode;
+};
+
+export function PathLabLayout({ sidebar, playground }: PathLabLayoutProps) {
+  return (
+    <Shell>
+      <Sidebar>
+        <SidebarTitle>
+          <p>Path Polygon Lab</p>
+          <h1>SVG path sampling</h1>
+        </SidebarTitle>
+
+        {sidebar}
+      </Sidebar>
+
+      <Playground>{playground}</Playground>
+    </Shell>
+  );
+}
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\components\PathPreviewPanel
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\components\PathPreviewPanel\PathPreviewPanel.styles.ts
+--------------------------------------------------
+import styled from "@emotion/styled";
+
+export const Panel = styled.div`
+  height: 100%;
+  min-height: calc(100vh - 48px);
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 18px;
+`;
+
+export const PreviewCard = styled.section`
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.78);
+  overflow: hidden;
+`;
+
+export const PreviewHeader = styled.header`
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(30, 41, 59, 0.48);
+
+  p {
+    margin: 0 0 4px;
+    color: #38bdf8;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  h2 {
+    margin: 0;
+    color: #f8fafc;
+    font-size: 16px;
+    line-height: 1.2;
+  }
+`;
+
+export const PreviewBody = styled.div`
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  padding: 16px;
+`;
+
+export const EmptyState = styled.div`
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: #94a3b8;
+  font-size: 14px;
+  text-align: center;
+`;
+
+export const Svg = styled.svg`
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 14px;
+  background:
+    linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+    rgba(2, 6, 23, 0.72);
+  background-size: 20px 20px;
+`;
+
+export const OriginalPath = styled.path`
+  fill: none;
+  stroke: #f8fafc;
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+`;
+
+export const GhostOriginalPath = styled.path`
+  fill: none;
+  stroke: rgba(248, 250, 252, 0.32);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+`;
+
+export const RawPolyline = styled.polyline`
+  fill: none;
+  stroke: rgba(56, 189, 248, 0.55);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+  vector-effect: non-scaling-stroke;
+`;
+
+export const FinalPolygonPath = styled.path`
+  fill: rgba(56, 189, 248, 0.08);
+  stroke: #38bdf8;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+`;
+
+export const VertexDot = styled.circle`
+  fill: #facc15;
+  stroke: #0f172a;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+`;
+
+export const VertexLabel = styled.text`
+  fill: #fde68a;
+  font-size: 5px;
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: #020617;
+  stroke-width: 2px;
+  stroke-linejoin: round;
+  pointer-events: none;
+  user-select: none;
+`;
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\components\PathPreviewPanel\PathPreviewPanel.tsx
+--------------------------------------------------
+import type { PathLabComputedResult } from "../../types/pathLabTypes";
+import { formatSvgViewBox } from "../../logic/pathViewBox";
+import {
+  createPointKey,
+  pointsToPathData,
+  pointsToPolylinePoints,
+} from "../../logic/polygonSvg";
+import {
+  EmptyState,
+  FinalPolygonPath,
+  GhostOriginalPath,
+  OriginalPath,
+  Panel,
+  PreviewBody,
+  PreviewCard,
+  PreviewHeader,
+  RawPolyline,
+  Svg,
+  VertexDot,
+  VertexLabel,
+} from "./PathPreviewPanel.styles";
+
+type PathPreviewPanelProps = {
+  pathData: string;
+  result: PathLabComputedResult | null;
+};
+
+export function PathPreviewPanel({ pathData, result }: PathPreviewPanelProps) {
+  if (!result) {
+    return (
+      <Panel>
+        <PreviewCard>
+          <PreviewHeader>
+            <p>Original</p>
+            <h2>SVG path</h2>
+          </PreviewHeader>
+
+          <PreviewBody>
+            <EmptyState>
+              Натисни “Перерахувати”, щоб побачити preview.
+            </EmptyState>
+          </PreviewBody>
+        </PreviewCard>
+
+        <PreviewCard>
+          <PreviewHeader>
+            <p>Optimized</p>
+            <h2>Final polygon</h2>
+          </PreviewHeader>
+
+          <PreviewBody>
+            <EmptyState>Тут буде optimized output після sampling.</EmptyState>
+          </PreviewBody>
+        </PreviewCard>
+      </Panel>
+    );
+  }
+
+  const viewBox = formatSvgViewBox(result.viewBox);
+  const rawPolylinePoints = pointsToPolylinePoints(result.rawSampledPolyline);
+  const finalPolygonPathData = pointsToPathData(result.finalPolygon, {
+    closePath: result.isPathClosed,
+  });
+
+  return (
+    <Panel>
+      <PreviewCard>
+        <PreviewHeader>
+          <p>Original</p>
+          <h2>SVG path один в один</h2>
+        </PreviewHeader>
+
+        <PreviewBody>
+          <Svg viewBox={viewBox} role="img" aria-label="Original SVG path">
+            <OriginalPath d={pathData} />
+          </Svg>
+        </PreviewBody>
+      </PreviewCard>
+
+      <PreviewCard>
+        <PreviewHeader>
+          <p>Optimized</p>
+          <h2>Raw sampled polyline + final polygon</h2>
+        </PreviewHeader>
+
+        <PreviewBody>
+          <Svg viewBox={viewBox} role="img" aria-label="Final polygon preview">
+            <GhostOriginalPath d={pathData} />
+
+            {result.rawSampledPolyline.length > 0 && (
+              <RawPolyline points={rawPolylinePoints} />
+            )}
+
+            {result.finalPolygon.length > 0 && (
+              <FinalPolygonPath d={finalPolygonPathData} />
+            )}
+
+            {result.finalPolygon.map((point, index) => (
+              <g key={createPointKey(point, index)}>
+                <VertexDot cx={point.x} cy={point.y} r={2.2} />
+                <VertexLabel x={point.x + 3.2} y={point.y - 3.2}>
+                  {index}
+                </VertexLabel>
+              </g>
+            ))}
+          </Svg>
+        </PreviewBody>
+      </PreviewCard>
+    </Panel>
+  );
+}
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\constants
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\constants\defaultPathLabState.ts
+--------------------------------------------------
+import type { PathLabInputState } from "../types/pathLabTypes";
+
+export const DEFAULT_PATH_DATA =
+  "M 0 0 L 150 0 C 150 20 180 20 180 40 L 0 40 Z";
+
+export const DEFAULT_SAMPLE_SEGMENT_COUNT = 20;
+
+export const DEFAULT_PATH_LAB_INPUT_STATE: PathLabInputState = {
+  pathData: DEFAULT_PATH_DATA,
+  sampleSegmentCount: DEFAULT_SAMPLE_SEGMENT_COUNT,
+};
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\logic
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\logic\computePathLabResult.ts
+--------------------------------------------------
+import type {
+  PathLabComputedResult,
+  PathLabDiagnostic,
+  PathLabInputState,
+} from "../types/pathLabTypes";
+import { createViewBoxFromPoints } from "./pathViewBox";
+import { isPathExplicitlyClosed } from "./pathClosure";
+import { optimizePolyline } from "./optimizePolyline";
+import { samplePath } from "./samplePath";
+
+function hasErrorDiagnostics(
+  diagnostics: readonly PathLabDiagnostic[],
+): boolean {
+  return diagnostics.some((diagnostic) => diagnostic.level === "error");
+}
+
+export function computePathLabResult(
+  input: PathLabInputState,
+): PathLabComputedResult {
+  const isPathClosed = isPathExplicitlyClosed(input.pathData);
+
+  const samplingResult = samplePath({
+    pathData: input.pathData,
+    sampleSegmentCount: input.sampleSegmentCount,
+  });
+
+  if (hasErrorDiagnostics(samplingResult.diagnostics)) {
+    return {
+      pathLength: samplingResult.pathLength,
+      rawSampledPolyline: samplingResult.rawSampledPolyline,
+      finalPolygon: [],
+      removedPointCount: 0,
+      isPathClosed,
+      viewBox: createViewBoxFromPoints(samplingResult.rawSampledPolyline),
+      diagnostics: samplingResult.diagnostics,
+    };
+  }
+
+  const optimizationResult = optimizePolyline(
+    samplingResult.rawSampledPolyline,
+  );
+
+  const diagnostics = [
+    ...samplingResult.diagnostics,
+    ...optimizationResult.diagnostics,
+  ];
+
+  return {
+    pathLength: samplingResult.pathLength,
+    rawSampledPolyline: samplingResult.rawSampledPolyline,
+    finalPolygon: optimizationResult.finalPolygon,
+    removedPointCount: optimizationResult.removedPointCount,
+    isPathClosed,
+    viewBox: createViewBoxFromPoints(samplingResult.rawSampledPolyline),
+    diagnostics,
+  };
+}
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\logic\curveSamplingConfig.ts
+--------------------------------------------------
+export const MAX_CURVE_REFERENCE_SEGMENT_COUNT = 1000;
+
+export const CURVE_REFERENCE_SAMPLE_SPACING_PX = 1;
+
+export function resolveCurveReferenceSegmentCount(curveLength: number): number {
+  if (!Number.isFinite(curveLength) || curveLength <= 0) {
+    return 1;
+  }
+
+  return Math.max(
+    1,
+    Math.min(
+      MAX_CURVE_REFERENCE_SEGMENT_COUNT,
+      Math.ceil(curveLength / CURVE_REFERENCE_SAMPLE_SPACING_PX),
+    ),
+  );
+}
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\logic\filterCurveSamplesByStep.ts
+--------------------------------------------------
+import type { Vec2 } from "../../../shared/types/geometry";
+
+export type FilterCurveSamplesByStepInput = {
+  denseSamples: readonly Vec2[];
+  curveLength: number;
+  stepPercent: number;
+};
+
+export type FilterCurveSamplesByStepResult = {
+  points: Vec2[];
+  allowedStep: number;
+};
+
+function getDistance(a: Vec2, b: Vec2): number {
+  return Math.hypot(b.x - a.x, b.y - a.y);
+}
+
+function areSamePoint(a: Vec2, b: Vec2): boolean {
+  return a.x === b.x && a.y === b.y;
+}
+
+function pushPointIfDifferent(points: Vec2[], point: Vec2) {
+  const previous = points.at(-1);
+
+  if (!previous || !areSamePoint(previous, point)) {
+    points.push(point);
+  }
+}
+
+function resolveAllowedStep(curveLength: number, stepPercent: number): number {
+  if (!Number.isFinite(curveLength) || curveLength <= 0) {
+    return 0;
+  }
+
+  if (!Number.isFinite(stepPercent) || stepPercent <= 0) {
+    return 0;
+  }
+
+  return (curveLength * stepPercent) / 100;
+}
+
+export function filterCurveSamplesByStep({
+  denseSamples,
+  curveLength,
+  stepPercent,
+}: FilterCurveSamplesByStepInput): FilterCurveSamplesByStepResult {
+  const allowedStep = resolveAllowedStep(curveLength, stepPercent);
+
+  if (denseSamples.length <= 2 || allowedStep <= 0) {
+    return {
+      points: [...denseSamples],
+      allowedStep,
+    };
+  }
+
+  const result: Vec2[] = [];
+  const firstPoint = denseSamples[0]!;
+  const lastPoint = denseSamples.at(-1)!;
+
+  let anchor = firstPoint;
+
+  pushPointIfDifferent(result, firstPoint);
+
+  for (let index = 1; index < denseSamples.length - 1; index += 1) {
+    const candidate = denseSamples[index]!;
+    const distanceFromAnchor = getDistance(anchor, candidate);
+
+    if (distanceFromAnchor >= allowedStep) {
+      pushPointIfDifferent(result, candidate);
+      anchor = candidate;
+    }
+  }
+
+  pushPointIfDifferent(result, lastPoint);
+
+  return {
+    points: result,
+    allowedStep,
+  };
+}
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\logic\optimizePolyline.ts
+--------------------------------------------------
+import type { Vec2 } from "../../../shared/types/geometry";
+import type { PathOptimizationResult } from "../types/pathLabTypes";
+
+function areSamePoint(a: Vec2, b: Vec2): boolean {
+  return a.x === b.x && a.y === b.y;
+}
+
+function crossProductZ(a: Vec2, b: Vec2, c: Vec2): number {
+  const abX = b.x - a.x;
+  const abY = b.y - a.y;
+
+  const bcX = c.x - b.x;
+  const bcY = c.y - b.y;
+
+  return abX * bcY - abY * bcX;
+}
+
+function isStrictlyCollinear(a: Vec2, b: Vec2, c: Vec2): boolean {
+  return crossProductZ(a, b, c) === 0;
+}
+
+function removeAdjacentDuplicates(points: readonly Vec2[]): Vec2[] {
+  const result: Vec2[] = [];
+
+  for (const point of points) {
+    const previous = result.at(-1);
+
+    if (!previous || !areSamePoint(previous, point)) {
+      result.push(point);
+    }
+  }
+
+  return result;
+}
+
+function isClosedPolyline(points: readonly Vec2[]): boolean {
+  if (points.length < 2) {
+    return false;
+  }
+
+  const first = points[0];
+  const last = points.at(-1);
+
+  return Boolean(last && areSamePoint(first, last));
+}
+
+function removeClosingDuplicate(points: readonly Vec2[]): Vec2[] {
+  if (!isClosedPolyline(points)) {
+    return [...points];
+  }
+
+  return points.slice(0, -1);
+}
+
+function removeOpenPolylineCollinearPoints(points: readonly Vec2[]): Vec2[] {
+  if (points.length < 3) {
+    return [...points];
+  }
+
+  const result: Vec2[] = [points[0]!];
+
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const previous = result.at(-1);
+    const current = points[index];
+    const next = points[index + 1];
+
+    if (
+      previous &&
+      current &&
+      next &&
+      isStrictlyCollinear(previous, current, next)
+    ) {
+      continue;
+    }
+
+    if (current) {
+      result.push(current);
+    }
+  }
+
+  result.push(points.at(-1)!);
+
+  return result;
+}
+
+function removeClosedPolylineCollinearPoints(points: readonly Vec2[]): Vec2[] {
+  if (points.length < 3) {
+    return [...points];
+  }
+
+  let currentPoints = [...points];
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+
+    const nextPoints: Vec2[] = [];
+
+    for (let index = 0; index < currentPoints.length; index += 1) {
+      const previous =
+        currentPoints[
+          (index - 1 + currentPoints.length) % currentPoints.length
+        ];
+      const current = currentPoints[index];
+      const next = currentPoints[(index + 1) % currentPoints.length];
+
+      if (
+        previous &&
+        current &&
+        next &&
+        isStrictlyCollinear(previous, current, next)
+      ) {
+        changed = true;
+        continue;
+      }
+
+      if (current) {
+        nextPoints.push(current);
+      }
+    }
+
+    currentPoints = nextPoints;
+
+    if (currentPoints.length < 3) {
+      break;
+    }
+  }
+
+  return currentPoints;
+}
+
+export function optimizePolyline(
+  rawSampledPolyline: readonly Vec2[],
+): PathOptimizationResult {
+  const withoutAdjacentDuplicates =
+    removeAdjacentDuplicates(rawSampledPolyline);
+  const wasClosed = isClosedPolyline(withoutAdjacentDuplicates);
+  const normalizedInput = removeClosingDuplicate(withoutAdjacentDuplicates);
+
+  const finalPolygon = wasClosed
+    ? removeClosedPolylineCollinearPoints(normalizedInput)
+    : removeOpenPolylineCollinearPoints(normalizedInput);
+
+  return {
+    finalPolygon,
+    removedPointCount: rawSampledPolyline.length - finalPolygon.length,
+    diagnostics: [],
+  };
+}
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\logic\pathClosure.ts
+--------------------------------------------------
+export function isPathExplicitlyClosed(pathData: string): boolean {
+  return /[zZ]\s*$/.test(pathData.trim());
+}
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\logic\pathViewBox.ts
+--------------------------------------------------
+import type {
+  BoundingBox2D,
+  SvgViewBox,
+  Vec2,
+} from "../../../shared/types/geometry";
+
+const DEFAULT_VIEW_BOX: SvgViewBox = {
+  x: -10,
+  y: -10,
+  width: 220,
+  height: 120,
+};
+
+const DEFAULT_VIEW_BOX_PADDING = 12;
+
+function isFinitePoint(point: Vec2): boolean {
+  return Number.isFinite(point.x) && Number.isFinite(point.y);
+}
+
+export function getBoundingBox2D(
+  points: readonly Vec2[],
+): BoundingBox2D | null {
+  const finitePoints = points.filter(isFinitePoint);
+
+  if (finitePoints.length === 0) {
+    return null;
+  }
+
+  let minX = finitePoints[0]!.x;
+  let minY = finitePoints[0]!.y;
+  let maxX = finitePoints[0]!.x;
+  let maxY = finitePoints[0]!.y;
+
+  for (const point of finitePoints) {
+    minX = Math.min(minX, point.x);
+    minY = Math.min(minY, point.y);
+    maxX = Math.max(maxX, point.x);
+    maxY = Math.max(maxY, point.y);
+  }
+
+  return {
+    min: {
+      x: minX,
+      y: minY,
+    },
+    max: {
+      x: maxX,
+      y: maxY,
+    },
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+}
+
+export function createViewBoxFromPoints(
+  points: readonly Vec2[],
+  padding: number = DEFAULT_VIEW_BOX_PADDING,
+): SvgViewBox {
+  const bounds = getBoundingBox2D(points);
+
+  if (!bounds) {
+    return DEFAULT_VIEW_BOX;
+  }
+
+  const safePadding = Number.isFinite(padding) && padding >= 0 ? padding : 0;
+
+  const width = bounds.width === 0 ? 1 : bounds.width;
+  const height = bounds.height === 0 ? 1 : bounds.height;
+
+  return {
+    x: bounds.min.x - safePadding,
+    y: bounds.min.y - safePadding,
+    width: width + safePadding * 2,
+    height: height + safePadding * 2,
+  };
+}
+
+export function formatSvgViewBox(viewBox: SvgViewBox): string {
+  return `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`;
+}
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\logic\polygonSvg.ts
+--------------------------------------------------
+import type { Vec2 } from "../../../shared/types/geometry";
+
+type PointsToPathDataOptions = {
+  closePath?: boolean;
+};
+
+function formatSvgNumber(value: number): string {
+  if (!Number.isFinite(value)) {
+    return "0";
+  }
+
+  return Number.parseFloat(value.toFixed(4)).toString();
+}
+
+function formatSvgPoint(point: Vec2): string {
+  return `${formatSvgNumber(point.x)},${formatSvgNumber(point.y)}`;
+}
+
+export function pointsToPolylinePoints(points: readonly Vec2[]): string {
+  return points.map(formatSvgPoint).join(" ");
+}
+
+export function pointsToPathData(
+  points: readonly Vec2[],
+  options: PointsToPathDataOptions = {},
+): string {
+  if (points.length === 0) {
+    return "";
+  }
+
+  const [firstPoint, ...restPoints] = points;
+
+  const commands = [
+    `M ${formatSvgNumber(firstPoint.x)} ${formatSvgNumber(firstPoint.y)}`,
+    ...restPoints.map(
+      (point) => `L ${formatSvgNumber(point.x)} ${formatSvgNumber(point.y)}`,
+    ),
+  ];
+
+  if (options.closePath) {
+    commands.push("Z");
+  }
+
+  return commands.join(" ");
+}
+
+export function createPointLabel(point: Vec2, index: number): string {
+  return `${index}: (${formatSvgNumber(point.x)}, ${formatSvgNumber(point.y)})`;
+}
+
+export function createPointKey(point: Vec2, index: number): string {
+  return `${index}-${formatSvgNumber(point.x)}-${formatSvgNumber(point.y)}`;
+}
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\logic\samplePath.ts
+--------------------------------------------------
+import { getLength, getPointAtLength, parsePath } from "@remotion/paths";
+import type { Instruction } from "@remotion/paths";
+
+import type { Vec2 } from "../../../shared/types/geometry";
+import type {
+  PathLabDiagnostic,
+  PathSamplingResult,
+} from "../types/pathLabTypes";
+
+type SamplePathInput = {
+  pathData: string;
+  sampleSegmentCount: number;
+};
+
+type MutablePathState = {
+  currentPoint: Vec2 | null;
+  subpathStartPoint: Vec2 | null;
+  points: Vec2[];
+  pathLength: number;
+  diagnostics: PathLabDiagnostic[];
+};
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Unknown path sampling error.";
+}
+
+function createErrorDiagnostic(
+  code: string,
+  message: string,
+  details?: unknown,
+): PathLabDiagnostic {
+  return {
+    code,
+    level: "error",
+    message,
+    details,
+  };
+}
+
+function createWarningDiagnostic(
+  code: string,
+  message: string,
+  details?: unknown,
+): PathLabDiagnostic {
+  return {
+    code,
+    level: "warning",
+    message,
+    details,
+  };
+}
+
+function resolveSegmentCount(sampleSegmentCount: number): {
+  segmentCount: number | null;
+  diagnostics: PathLabDiagnostic[];
+} {
+  if (!Number.isFinite(sampleSegmentCount) || sampleSegmentCount < 1) {
+    return {
+      segmentCount: null,
+      diagnostics: [
+        createErrorDiagnostic(
+          "INVALID_SAMPLE_SEGMENT_COUNT",
+          "Sample segment count must be a finite number greater than or equal to 1.",
+          { sampleSegmentCount },
+        ),
+      ],
+    };
+  }
+
+  const roundedSegmentCount = Math.floor(sampleSegmentCount);
+
+  if (roundedSegmentCount !== sampleSegmentCount) {
+    return {
+      segmentCount: roundedSegmentCount,
+      diagnostics: [
+        createWarningDiagnostic(
+          "SAMPLE_SEGMENT_COUNT_ROUNDED",
+          "Sample segment count was rounded down to an integer.",
+          {
+            input: sampleSegmentCount,
+            rounded: roundedSegmentCount,
+          },
+        ),
+      ],
+    };
+  }
+
+  return {
+    segmentCount: sampleSegmentCount,
+    diagnostics: [],
+  };
+}
+
+function areSamePoint(a: Vec2, b: Vec2): boolean {
+  return a.x === b.x && a.y === b.y;
+}
+
+function pushPoint(points: Vec2[], point: Vec2) {
+  const previous = points.at(-1);
+
+  if (!previous || !areSamePoint(previous, point)) {
+    points.push(point);
+  }
+}
+
+function getLineLength(a: Vec2, b: Vec2): number {
+  return Math.hypot(b.x - a.x, b.y - a.y);
+}
+
+function formatPoint(point: Vec2): string {
+  return `${point.x} ${point.y}`;
+}
+
+function sampleCurveSegment(
+  segmentPathData: string,
+  segmentCount: number,
+): {
+  points: Vec2[];
+  length: number;
+} {
+  const length = getLength(segmentPathData);
+  const points: Vec2[] = [];
+
+  for (let index = 1; index <= segmentCount; index += 1) {
+    const distance = (length * index) / segmentCount;
+    const point = getPointAtLength(segmentPathData, distance);
+
+    points.push({
+      x: point.x,
+      y: point.y,
+    });
+  }
+
+  return {
+    points,
+    length,
+  };
+}
+
+function requireCurrentPoint(
+  state: MutablePathState,
+  instruction: Instruction,
+): Vec2 | null {
+  if (state.currentPoint) {
+    return state.currentPoint;
+  }
+
+  state.diagnostics.push(
+    createErrorDiagnostic(
+      "PATH_COMMAND_BEFORE_MOVE",
+      "Path command was found before an initial move command.",
+      { instruction },
+    ),
+  );
+
+  return null;
+}
+
+function handleMoveInstruction(
+  state: MutablePathState,
+  instruction: Extract<Instruction, { type: "M" | "m" }>,
+) {
+  const nextPoint =
+    instruction.type === "M"
+      ? { x: instruction.x, y: instruction.y }
+      : state.currentPoint
+        ? {
+            x: state.currentPoint.x + instruction.dx,
+            y: state.currentPoint.y + instruction.dy,
+          }
+        : { x: instruction.dx, y: instruction.dy };
+
+  state.currentPoint = nextPoint;
+  state.subpathStartPoint = nextPoint;
+  pushPoint(state.points, nextPoint);
+}
+
+function handleLineToPoint(state: MutablePathState, nextPoint: Vec2) {
+  const currentPoint = requireCurrentPoint(state, {
+    type: "L",
+    x: nextPoint.x,
+    y: nextPoint.y,
+  });
+
+  if (!currentPoint) {
+    return;
+  }
+
+  state.pathLength += getLineLength(currentPoint, nextPoint);
+  state.currentPoint = nextPoint;
+  pushPoint(state.points, nextPoint);
+}
+
+function handleLineInstruction(
+  state: MutablePathState,
+  instruction: Extract<
+    Instruction,
+    { type: "L" | "l" | "H" | "h" | "V" | "v" }
+  >,
+) {
+  const currentPoint = requireCurrentPoint(state, instruction);
+
+  if (!currentPoint) {
+    return;
+  }
+
+  if (instruction.type === "L") {
+    handleLineToPoint(state, { x: instruction.x, y: instruction.y });
+    return;
+  }
+
+  if (instruction.type === "l") {
+    handleLineToPoint(state, {
+      x: currentPoint.x + instruction.dx,
+      y: currentPoint.y + instruction.dy,
+    });
+    return;
+  }
+
+  if (instruction.type === "H") {
+    handleLineToPoint(state, { x: instruction.x, y: currentPoint.y });
+    return;
+  }
+
+  if (instruction.type === "h") {
+    handleLineToPoint(state, {
+      x: currentPoint.x + instruction.dx,
+      y: currentPoint.y,
+    });
+    return;
+  }
+
+  if (instruction.type === "V") {
+    handleLineToPoint(state, { x: currentPoint.x, y: instruction.y });
+    return;
+  }
+
+  handleLineToPoint(state, {
+    x: currentPoint.x,
+    y: currentPoint.y + instruction.dy,
+  });
+}
+
+function handleCubicInstruction(
+  state: MutablePathState,
+  instruction: Extract<Instruction, { type: "C" | "c" }>,
+  segmentCount: number,
+) {
+  const currentPoint = requireCurrentPoint(state, instruction);
+
+  if (!currentPoint) {
+    return;
+  }
+
+  const absoluteInstruction =
+    instruction.type === "C"
+      ? {
+          cp1: { x: instruction.cp1x, y: instruction.cp1y },
+          cp2: { x: instruction.cp2x, y: instruction.cp2y },
+          end: { x: instruction.x, y: instruction.y },
+        }
+      : {
+          cp1: {
+            x: currentPoint.x + instruction.cp1dx,
+            y: currentPoint.y + instruction.cp1dy,
+          },
+          cp2: {
+            x: currentPoint.x + instruction.cp2dx,
+            y: currentPoint.y + instruction.cp2dy,
+          },
+          end: {
+            x: currentPoint.x + instruction.dx,
+            y: currentPoint.y + instruction.dy,
+          },
+        };
+
+  const segmentPathData = [
+    `M ${formatPoint(currentPoint)}`,
+    `C ${formatPoint(absoluteInstruction.cp1)}`,
+    formatPoint(absoluteInstruction.cp2),
+    formatPoint(absoluteInstruction.end),
+  ].join(" ");
+
+  const sampled = sampleCurveSegment(segmentPathData, segmentCount);
+
+  state.pathLength += sampled.length;
+  sampled.points.forEach((point) => pushPoint(state.points, point));
+  state.currentPoint = absoluteInstruction.end;
+}
+
+function handleQuadraticInstruction(
+  state: MutablePathState,
+  instruction: Extract<Instruction, { type: "Q" | "q" }>,
+  segmentCount: number,
+) {
+  const currentPoint = requireCurrentPoint(state, instruction);
+
+  if (!currentPoint) {
+    return;
+  }
+
+  const absoluteInstruction =
+    instruction.type === "Q"
+      ? {
+          cp: { x: instruction.cpx, y: instruction.cpy },
+          end: { x: instruction.x, y: instruction.y },
+        }
+      : {
+          cp: {
+            x: currentPoint.x + instruction.cpdx,
+            y: currentPoint.y + instruction.cpdy,
+          },
+          end: {
+            x: currentPoint.x + instruction.dx,
+            y: currentPoint.y + instruction.dy,
+          },
+        };
+
+  const segmentPathData = [
+    `M ${formatPoint(currentPoint)}`,
+    `Q ${formatPoint(absoluteInstruction.cp)}`,
+    formatPoint(absoluteInstruction.end),
+  ].join(" ");
+
+  const sampled = sampleCurveSegment(segmentPathData, segmentCount);
+
+  state.pathLength += sampled.length;
+  sampled.points.forEach((point) => pushPoint(state.points, point));
+  state.currentPoint = absoluteInstruction.end;
+}
+
+function handleCloseInstruction(state: MutablePathState) {
+  if (!state.currentPoint || !state.subpathStartPoint) {
+    state.diagnostics.push(
+      createErrorDiagnostic(
+        "CLOSE_COMMAND_WITHOUT_SUBPATH",
+        "Close command was found before a valid subpath start.",
+      ),
+    );
+
+    return;
+  }
+
+  state.pathLength += getLineLength(
+    state.currentPoint,
+    state.subpathStartPoint,
+  );
+  state.currentPoint = state.subpathStartPoint;
+  pushPoint(state.points, state.subpathStartPoint);
+}
+
+function handleUnsupportedInstruction(
+  state: MutablePathState,
+  instruction: Instruction,
+) {
+  state.diagnostics.push(
+    createWarningDiagnostic(
+      "UNSUPPORTED_PATH_COMMAND_SAMPLED_AS_ENDPOINT_ONLY",
+      "This path command is not fully sampled yet. Only its endpoint is preserved when possible.",
+      { instruction },
+    ),
+  );
+
+  const currentPoint = requireCurrentPoint(state, instruction);
+
+  if (!currentPoint) {
+    return;
+  }
+
+  if (
+    instruction.type === "A" ||
+    instruction.type === "S" ||
+    instruction.type === "T"
+  ) {
+    handleLineToPoint(state, { x: instruction.x, y: instruction.y });
+    return;
+  }
+
+  if (
+    instruction.type === "a" ||
+    instruction.type === "s" ||
+    instruction.type === "t"
+  ) {
+    handleLineToPoint(state, {
+      x: currentPoint.x + instruction.dx,
+      y: currentPoint.y + instruction.dy,
+    });
+  }
+}
+
+export function samplePath({
+  pathData,
+  sampleSegmentCount,
+}: SamplePathInput): PathSamplingResult {
+  const trimmedPathData = pathData.trim();
+
+  if (!trimmedPathData) {
+    return {
+      pathLength: 0,
+      rawSampledPolyline: [],
+      diagnostics: [
+        createErrorDiagnostic(
+          "EMPTY_PATH_DATA",
+          "SVG path data must not be empty.",
+        ),
+      ],
+    };
+  }
+
+  const segmentCountResult = resolveSegmentCount(sampleSegmentCount);
+
+  if (segmentCountResult.segmentCount === null) {
+    return {
+      pathLength: 0,
+      rawSampledPolyline: [],
+      diagnostics: segmentCountResult.diagnostics,
+    };
+  }
+
+  let instructions: Instruction[];
+
+  try {
+    instructions = parsePath(trimmedPathData);
+  } catch (error) {
+    return {
+      pathLength: 0,
+      rawSampledPolyline: [],
+      diagnostics: [
+        ...segmentCountResult.diagnostics,
+        createErrorDiagnostic(
+          "PATH_PARSE_FAILED",
+          "Failed to parse SVG path.",
+          {
+            error: getErrorMessage(error),
+          },
+        ),
+      ],
+    };
+  }
+
+  const state: MutablePathState = {
+    currentPoint: null,
+    subpathStartPoint: null,
+    points: [],
+    pathLength: 0,
+    diagnostics: [...segmentCountResult.diagnostics],
+  };
+
+  try {
+    for (const instruction of instructions) {
+      if (instruction.type === "M" || instruction.type === "m") {
+        handleMoveInstruction(state, instruction);
+        continue;
+      }
+
+      if (
+        instruction.type === "L" ||
+        instruction.type === "l" ||
+        instruction.type === "H" ||
+        instruction.type === "h" ||
+        instruction.type === "V" ||
+        instruction.type === "v"
+      ) {
+        handleLineInstruction(state, instruction);
+        continue;
+      }
+
+      if (instruction.type === "C" || instruction.type === "c") {
+        handleCubicInstruction(
+          state,
+          instruction,
+          segmentCountResult.segmentCount,
+        );
+        continue;
+      }
+
+      if (instruction.type === "Q" || instruction.type === "q") {
+        handleQuadraticInstruction(
+          state,
+          instruction,
+          segmentCountResult.segmentCount,
+        );
+        continue;
+      }
+
+      if (instruction.type === "Z") {
+        handleCloseInstruction(state);
+        continue;
+      }
+
+      handleUnsupportedInstruction(state, instruction);
+    }
+  } catch (error) {
+    return {
+      pathLength: state.pathLength,
+      rawSampledPolyline: [],
+      diagnostics: [
+        ...state.diagnostics,
+        createErrorDiagnostic(
+          "PATH_SEGMENT_SAMPLING_FAILED",
+          "Failed to sample SVG path by instructions.",
+          { error: getErrorMessage(error) },
+        ),
+      ],
+    };
+  }
+
+  return {
+    pathLength: state.pathLength,
+    rawSampledPolyline: state.points,
+    diagnostics: state.diagnostics,
+  };
+}
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\types
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\features\path-lab\types\pathLabTypes.ts
+--------------------------------------------------
+import type {
+  Polygon2D,
+  Polyline2D,
+  SvgViewBox,
+} from "../../../shared/types/geometry";
+
+export type PathLabInputState = {
+  pathData: string;
+  sampleSegmentCount: number;
+};
+
+export type PathLabDiagnosticLevel = "error" | "warning" | "info";
+
+export type PathLabDiagnostic = {
+  code: string;
+  level: PathLabDiagnosticLevel;
+  message: string;
+  details?: unknown;
+};
+
+export type PathSamplingResult = {
+  pathLength: number;
+  rawSampledPolyline: Polyline2D;
+  diagnostics: PathLabDiagnostic[];
+};
+
+export type PathOptimizationResult = {
+  finalPolygon: Polygon2D;
+  removedPointCount: number;
+  diagnostics: PathLabDiagnostic[];
+};
+
+export type PathLabComputedResult = {
+  pathLength: number;
+  rawSampledPolyline: Polyline2D;
+  finalPolygon: Polygon2D;
+  removedPointCount: number;
+  isPathClosed: boolean;
+  viewBox: SvgViewBox;
+  diagnostics: PathLabDiagnostic[];
+};
+
+export type PathLabState = PathLabInputState & {
+  result: PathLabComputedResult | null;
+};
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\shared
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\shared\types
+--------------------------------------------------
+D:\ProjectsVVV\_Tools\path-polygon-lab\src\shared\types\geometry.ts
+--------------------------------------------------
+export type Vec2 = {
+  x: number;
+  y: number;
+};
+
+export type BoundingBox2D = {
+  min: Vec2;
+  max: Vec2;
+  width: number;
+  height: number;
+};
+
+export type SvgViewBox = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type Polyline2D = Vec2[];
+
+export type Polygon2D = Vec2[];
+--------------------------------------------------
