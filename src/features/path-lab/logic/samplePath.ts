@@ -1,5 +1,10 @@
-import { getLength, getPointAtLength, parsePath } from "@remotion/paths";
-import type { Instruction } from "@remotion/paths";
+import {
+  getLength,
+  getPointAtLength,
+  parsePath,
+  reduceInstructions,
+} from "@remotion/paths";
+import type { ReducedInstruction } from "@remotion/paths";
 
 import type { Vec2 } from "../../../shared/types/geometry";
 import type {
@@ -22,7 +27,7 @@ type CurveFeatureReason =
 
 type CurveFeatureDebugPoint = {
   curveIndex: number;
-  curveType: "C" | "Q";
+  curveType: "C";
   sampleIndex: number;
   t: number;
   point: Vec2;
@@ -267,17 +272,11 @@ function detectCoordinateExtrema(
     const current = denseSamples[index]!;
     const next = denseSamples[index + 1]!;
 
-    const previousDx = current.x - previous.x;
-    const nextDx = next.x - current.x;
+    const xSignBefore = stableSign(current.x - previous.x, coordinateEpsilon);
+    const xSignAfter = stableSign(next.x - current.x, coordinateEpsilon);
 
-    const previousDy = current.y - previous.y;
-    const nextDy = next.y - current.y;
-
-    const xSignBefore = stableSign(previousDx, coordinateEpsilon);
-    const xSignAfter = stableSign(nextDx, coordinateEpsilon);
-
-    const ySignBefore = stableSign(previousDy, coordinateEpsilon);
-    const ySignAfter = stableSign(nextDy, coordinateEpsilon);
+    const ySignBefore = stableSign(current.y - previous.y, coordinateEpsilon);
+    const ySignAfter = stableSign(next.y - current.y, coordinateEpsilon);
 
     if (xSignBefore !== 0 && xSignAfter !== 0 && xSignBefore !== xSignAfter) {
       addFeatureCandidate(candidates, index, current, "x-extremum");
@@ -440,115 +439,50 @@ function getSlicedSamplesByForcedFeatures(
   return slices;
 }
 
-function requireCurrentPoint(
-  state: MutablePathState,
-  instruction: Instruction,
-): Vec2 | null {
-  if (state.currentPoint) {
-    return state.currentPoint;
-  }
-
-  state.diagnostics.push(
-    createErrorDiagnostic(
-      "PATH_COMMAND_BEFORE_MOVE",
-      "Path command was found before an initial move command.",
-      { instruction },
-    ),
-  );
-
-  return null;
-}
-
 function handleMoveInstruction(
   state: MutablePathState,
-  instruction: Extract<Instruction, { type: "M" | "m" }>,
+  instruction: Extract<ReducedInstruction, { type: "M" }>,
 ) {
-  const nextPoint =
-    instruction.type === "M"
-      ? { x: instruction.x, y: instruction.y }
-      : state.currentPoint
-        ? {
-            x: state.currentPoint.x + instruction.dx,
-            y: state.currentPoint.y + instruction.dy,
-          }
-        : { x: instruction.dx, y: instruction.dy };
+  const nextPoint = {
+    x: instruction.x,
+    y: instruction.y,
+  };
 
   state.currentPoint = nextPoint;
   state.subpathStartPoint = nextPoint;
   pushPoint(state.points, nextPoint);
 }
 
-function handleLineToPoint(state: MutablePathState, nextPoint: Vec2) {
-  const currentPoint = requireCurrentPoint(state, {
-    type: "L",
-    x: nextPoint.x,
-    y: nextPoint.y,
-  });
-
-  if (!currentPoint) {
-    return;
-  }
-
-  state.pathLength += getLineLength(currentPoint, nextPoint);
-  state.currentPoint = nextPoint;
-  pushPoint(state.points, nextPoint);
-}
-
 function handleLineInstruction(
   state: MutablePathState,
-  instruction: Extract<
-    Instruction,
-    { type: "L" | "l" | "H" | "h" | "V" | "v" }
-  >,
+  instruction: Extract<ReducedInstruction, { type: "L" }>,
 ) {
-  const currentPoint = requireCurrentPoint(state, instruction);
+  if (!state.currentPoint) {
+    state.diagnostics.push(
+      createErrorDiagnostic(
+        "LINE_COMMAND_BEFORE_MOVE",
+        "Line command was found before an initial move command.",
+        { instruction },
+      ),
+    );
 
-  if (!currentPoint) {
     return;
   }
 
-  if (instruction.type === "L") {
-    handleLineToPoint(state, { x: instruction.x, y: instruction.y });
-    return;
-  }
+  const nextPoint = {
+    x: instruction.x,
+    y: instruction.y,
+  };
 
-  if (instruction.type === "l") {
-    handleLineToPoint(state, {
-      x: currentPoint.x + instruction.dx,
-      y: currentPoint.y + instruction.dy,
-    });
-    return;
-  }
-
-  if (instruction.type === "H") {
-    handleLineToPoint(state, { x: instruction.x, y: currentPoint.y });
-    return;
-  }
-
-  if (instruction.type === "h") {
-    handleLineToPoint(state, {
-      x: currentPoint.x + instruction.dx,
-      y: currentPoint.y,
-    });
-    return;
-  }
-
-  if (instruction.type === "V") {
-    handleLineToPoint(state, { x: currentPoint.x, y: instruction.y });
-    return;
-  }
-
-  handleLineToPoint(state, {
-    x: currentPoint.x,
-    y: currentPoint.y + instruction.dy,
-  });
+  state.pathLength += getLineLength(state.currentPoint, nextPoint);
+  state.currentPoint = nextPoint;
+  pushPoint(state.points, nextPoint);
 }
 
 function pushFilteredCurvePoints(
   state: MutablePathState,
   segmentPathData: string,
   stepPercent: number,
-  curveType: "C" | "Q",
 ) {
   const denseSamples = sampleDenseCurveSegment(segmentPathData);
   const features = detectCurveFeatures(
@@ -563,7 +497,7 @@ function pushFilteredCurvePoints(
   features.forEach((feature) => {
     state.curveFeatures.push({
       curveIndex: state.curveIndex,
-      curveType,
+      curveType: "C",
       sampleIndex: feature.index,
       t: feature.index / denseSamples.referenceSegmentCount,
       point: feature.point,
@@ -589,84 +523,33 @@ function pushFilteredCurvePoints(
 
 function handleCubicInstruction(
   state: MutablePathState,
-  instruction: Extract<Instruction, { type: "C" | "c" }>,
+  instruction: Extract<ReducedInstruction, { type: "C" }>,
   stepPercent: number,
 ) {
-  const currentPoint = requireCurrentPoint(state, instruction);
+  if (!state.currentPoint) {
+    state.diagnostics.push(
+      createErrorDiagnostic(
+        "CURVE_COMMAND_BEFORE_MOVE",
+        "Curve command was found before an initial move command.",
+        { instruction },
+      ),
+    );
 
-  if (!currentPoint) {
     return;
   }
 
-  const absoluteInstruction =
-    instruction.type === "C"
-      ? {
-          cp1: { x: instruction.cp1x, y: instruction.cp1y },
-          cp2: { x: instruction.cp2x, y: instruction.cp2y },
-          end: { x: instruction.x, y: instruction.y },
-        }
-      : {
-          cp1: {
-            x: currentPoint.x + instruction.cp1dx,
-            y: currentPoint.y + instruction.cp1dy,
-          },
-          cp2: {
-            x: currentPoint.x + instruction.cp2dx,
-            y: currentPoint.y + instruction.cp2dy,
-          },
-          end: {
-            x: currentPoint.x + instruction.dx,
-            y: currentPoint.y + instruction.dy,
-          },
-        };
-
   const segmentPathData = [
-    `M ${formatPoint(currentPoint)}`,
-    `C ${formatPoint(absoluteInstruction.cp1)}`,
-    formatPoint(absoluteInstruction.cp2),
-    formatPoint(absoluteInstruction.end),
+    `M ${formatPoint(state.currentPoint)}`,
+    `C ${instruction.cp1x} ${instruction.cp1y}`,
+    `${instruction.cp2x} ${instruction.cp2y}`,
+    `${instruction.x} ${instruction.y}`,
   ].join(" ");
 
-  pushFilteredCurvePoints(state, segmentPathData, stepPercent, "C");
-  state.currentPoint = absoluteInstruction.end;
-}
-
-function handleQuadraticInstruction(
-  state: MutablePathState,
-  instruction: Extract<Instruction, { type: "Q" | "q" }>,
-  stepPercent: number,
-) {
-  const currentPoint = requireCurrentPoint(state, instruction);
-
-  if (!currentPoint) {
-    return;
-  }
-
-  const absoluteInstruction =
-    instruction.type === "Q"
-      ? {
-          cp: { x: instruction.cpx, y: instruction.cpy },
-          end: { x: instruction.x, y: instruction.y },
-        }
-      : {
-          cp: {
-            x: currentPoint.x + instruction.cpdx,
-            y: currentPoint.y + instruction.cpdy,
-          },
-          end: {
-            x: currentPoint.x + instruction.dx,
-            y: currentPoint.y + instruction.dy,
-          },
-        };
-
-  const segmentPathData = [
-    `M ${formatPoint(currentPoint)}`,
-    `Q ${formatPoint(absoluteInstruction.cp)}`,
-    formatPoint(absoluteInstruction.end),
-  ].join(" ");
-
-  pushFilteredCurvePoints(state, segmentPathData, stepPercent, "Q");
-  state.currentPoint = absoluteInstruction.end;
+  pushFilteredCurvePoints(state, segmentPathData, stepPercent);
+  state.currentPoint = {
+    x: instruction.x,
+    y: instruction.y,
+  };
 }
 
 function handleCloseInstruction(state: MutablePathState) {
@@ -685,46 +568,36 @@ function handleCloseInstruction(state: MutablePathState) {
     state.currentPoint,
     state.subpathStartPoint,
   );
+
   state.currentPoint = state.subpathStartPoint;
   pushPoint(state.points, state.subpathStartPoint);
 }
 
-function handleUnsupportedInstruction(
-  state: MutablePathState,
-  instruction: Instruction,
-) {
-  state.diagnostics.push(
-    createWarningDiagnostic(
-      "UNSUPPORTED_PATH_COMMAND_SAMPLED_AS_ENDPOINT_ONLY",
-      "This path command is not fully sampled yet. Only its endpoint is preserved when possible.",
-      { instruction },
-    ),
-  );
+function getReducedInstructions(pathData: string): {
+  reducedInstructions: ReducedInstruction[] | null;
+  diagnostics: PathLabDiagnostic[];
+} {
+  try {
+    const parsedInstructions = parsePath(pathData);
+    const reducedInstructions = reduceInstructions(parsedInstructions);
 
-  const currentPoint = requireCurrentPoint(state, instruction);
-
-  if (!currentPoint) {
-    return;
-  }
-
-  if (
-    instruction.type === "A" ||
-    instruction.type === "S" ||
-    instruction.type === "T"
-  ) {
-    handleLineToPoint(state, { x: instruction.x, y: instruction.y });
-    return;
-  }
-
-  if (
-    instruction.type === "a" ||
-    instruction.type === "s" ||
-    instruction.type === "t"
-  ) {
-    handleLineToPoint(state, {
-      x: currentPoint.x + instruction.dx,
-      y: currentPoint.y + instruction.dy,
-    });
+    return {
+      reducedInstructions,
+      diagnostics: [],
+    };
+  } catch (error) {
+    return {
+      reducedInstructions: null,
+      diagnostics: [
+        createErrorDiagnostic(
+          "PATH_PARSE_OR_REDUCE_FAILED",
+          "Failed to parse or reduce SVG path.",
+          {
+            error: getErrorMessage(error),
+          },
+        ),
+      ],
+    };
   }
 }
 
@@ -736,6 +609,19 @@ export function samplePath({
 
   const trimmedPathData = pathData.trim();
 
+  if (!trimmedPathData) {
+    return {
+      pathLength: 0,
+      rawSampledPolyline: [],
+      diagnostics: [
+        createErrorDiagnostic(
+          "EMPTY_PATH_DATA",
+          "SVG path data must not be empty.",
+        ),
+      ],
+    };
+  }
+
   const stepPercentResult = resolveStepPercent(stepPercent);
 
   if (stepPercentResult.resolvedStepPercent === null) {
@@ -746,23 +632,15 @@ export function samplePath({
     };
   }
 
-  let instructions: Instruction[];
+  const reduceResult = getReducedInstructions(trimmedPathData);
 
-  try {
-    instructions = parsePath(trimmedPathData);
-  } catch (error) {
+  if (!reduceResult.reducedInstructions) {
     return {
       pathLength: 0,
       rawSampledPolyline: [],
       diagnostics: [
         ...stepPercentResult.diagnostics,
-        createErrorDiagnostic(
-          "PATH_PARSE_FAILED",
-          "Failed to parse SVG path.",
-          {
-            error: getErrorMessage(error),
-          },
-        ),
+        ...reduceResult.diagnostics,
       ],
     };
   }
@@ -778,35 +656,19 @@ export function samplePath({
   };
 
   try {
-    for (const instruction of instructions) {
-      if (instruction.type === "M" || instruction.type === "m") {
+    for (const instruction of reduceResult.reducedInstructions) {
+      if (instruction.type === "M") {
         handleMoveInstruction(state, instruction);
         continue;
       }
 
-      if (
-        instruction.type === "L" ||
-        instruction.type === "l" ||
-        instruction.type === "H" ||
-        instruction.type === "h" ||
-        instruction.type === "V" ||
-        instruction.type === "v"
-      ) {
+      if (instruction.type === "L") {
         handleLineInstruction(state, instruction);
         continue;
       }
 
-      if (instruction.type === "C" || instruction.type === "c") {
+      if (instruction.type === "C") {
         handleCubicInstruction(
-          state,
-          instruction,
-          stepPercentResult.resolvedStepPercent,
-        );
-        continue;
-      }
-
-      if (instruction.type === "Q" || instruction.type === "q") {
-        handleQuadraticInstruction(
           state,
           instruction,
           stepPercentResult.resolvedStepPercent,
@@ -819,7 +681,13 @@ export function samplePath({
         continue;
       }
 
-      handleUnsupportedInstruction(state, instruction);
+      state.diagnostics.push(
+        createWarningDiagnostic(
+          "UNEXPECTED_REDUCED_INSTRUCTION",
+          "Unexpected instruction type after reduceInstructions.",
+          { instruction },
+        ),
+      );
     }
   } catch (error) {
     publishCurveFeatures(state.curveFeatures);
@@ -830,8 +698,8 @@ export function samplePath({
       diagnostics: [
         ...state.diagnostics,
         createErrorDiagnostic(
-          "PATH_SEGMENT_SAMPLING_FAILED",
-          "Failed to sample SVG path by instructions.",
+          "REDUCED_PATH_SAMPLING_FAILED",
+          "Failed to sample reduced SVG path.",
           { error: getErrorMessage(error) },
         ),
       ],

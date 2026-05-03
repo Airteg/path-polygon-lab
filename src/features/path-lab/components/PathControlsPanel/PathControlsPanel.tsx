@@ -111,7 +111,7 @@ export function PathControlsPanel({
         </StatRow>
 
         <StatRow>
-          <span>Removed collinear points</span>
+          <span>Removed / normalized points</span>
           <strong>{result?.removedPointCount ?? "—"}</strong>
         </StatRow>
 
