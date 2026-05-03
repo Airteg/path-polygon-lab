@@ -9,6 +9,7 @@ import type {
   PathLabComputedResult,
   PathLabInputState,
 } from "./types/pathLabTypes";
+import { inspectRemotionInstructions } from "./logic/inspectRemotionInstructions";
 
 type ComputedSnapshot = {
   input: PathLabInputState;
@@ -42,8 +43,32 @@ export function PathLab() {
       return;
     }
 
-    console.group("[path-polygon-lab] finalPolygon");
-    console.log(JSON.stringify(computedSnapshot.result.finalPolygon, null, 2));
+    const debugStore = globalThis as unknown as {
+      __PATH_POLYGON_LAB_CURVE_FEATURES__?: unknown;
+    };
+
+    let instructionInspection: unknown = null;
+
+    try {
+      instructionInspection = inspectRemotionInstructions(
+        computedSnapshot.input.pathData,
+      );
+    } catch (error) {
+      instructionInspection = {
+        error,
+      };
+    }
+
+    console.group("[path-polygon-lab] output");
+    console.log(
+      "finalPolygon",
+      JSON.stringify(computedSnapshot.result.finalPolygon, null, 2),
+    );
+    console.log(
+      "curveFeatures",
+      debugStore.__PATH_POLYGON_LAB_CURVE_FEATURES__,
+    );
+    console.log("remotionInstructions", instructionInspection);
     console.groupEnd();
   }
 

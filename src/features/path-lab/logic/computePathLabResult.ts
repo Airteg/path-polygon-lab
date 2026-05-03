@@ -7,6 +7,7 @@ import { createViewBoxFromPoints } from "./pathViewBox";
 import { isPathExplicitlyClosed } from "./pathClosure";
 import { optimizePolyline } from "./optimizePolyline";
 import { samplePath } from "./samplePath";
+import { normalizeOutputPolygon } from "./normalizeOutputPolygon";
 
 function hasErrorDiagnostics(
   diagnostics: readonly PathLabDiagnostic[],
@@ -40,16 +41,37 @@ export function computePathLabResult(
     samplingResult.rawSampledPolyline,
   );
 
+  const normalizedOutput = normalizeOutputPolygon(
+    optimizationResult.finalPolygon,
+  );
+
+  const outputNormalizationDiagnostics: PathLabDiagnostic[] =
+    normalizedOutput.removedPointCount > 0
+      ? [
+          {
+            code: "OUTPUT_NORMALIZATION_REMOVED_DUPLICATE_POINTS",
+            level: "warning",
+            message:
+              "Output normalization removed adjacent duplicate points after coordinate rounding.",
+            details: {
+              removedPointCount: normalizedOutput.removedPointCount,
+            },
+          },
+        ]
+      : [];
+
   const diagnostics = [
     ...samplingResult.diagnostics,
     ...optimizationResult.diagnostics,
+    ...outputNormalizationDiagnostics,
   ];
 
   return {
     pathLength: samplingResult.pathLength,
     rawSampledPolyline: samplingResult.rawSampledPolyline,
-    finalPolygon: optimizationResult.finalPolygon,
-    removedPointCount: optimizationResult.removedPointCount,
+    finalPolygon: normalizedOutput.polygon,
+    removedPointCount:
+      optimizationResult.removedPointCount + normalizedOutput.removedPointCount,
     isPathClosed,
     viewBox: createViewBoxFromPoints(samplingResult.rawSampledPolyline),
     diagnostics,
